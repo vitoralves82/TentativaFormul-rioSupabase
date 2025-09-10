@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 
 // These should be environment variables in a real application
 const supabaseUrl = 'https://wlveikyzyrkbuwxetamo.supabase.co'
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndsdmVpa3l6eXJrYnV3eGV0YW1vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcyNjc2NzAsImV4cCI6MjA3Mjg0MzY3MH0.YPCcQc6wqDKTv1V_gmUb9TvUmTxgjgXmn6nqOWwhCY0'
+const supabaseAnonKey = 'YOUR_SUPABASE_ANON_KEY'
 
 // Create Supabase client
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)

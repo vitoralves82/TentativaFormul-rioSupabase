@@ -91,4 +91,3 @@ export async function submitAnswers(
   return supabaseService.saveAnswers(respondentId, answersMap);
 }
 
-

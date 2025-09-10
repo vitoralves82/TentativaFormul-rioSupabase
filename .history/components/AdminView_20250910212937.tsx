@@ -46,8 +46,8 @@ const AdminView: React.FC<AdminViewProps> = ({ onProjectCreate }) => {
   };
 
   const handleSaveAndSend = async () => {
-    setIsSubmitting(true);
-    setSubmissionStatus('idle');
+  setIsSubmitting(true);
+  setSubmissionStatus('idle');
     try {
       const result = await supabaseService.saveProjectData({ projectName, clientName, recipients });
 

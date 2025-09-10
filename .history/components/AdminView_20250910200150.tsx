@@ -46,34 +46,27 @@ const AdminView: React.FC<AdminViewProps> = ({ onProjectCreate }) => {
   };
 
   const handleSaveAndSend = async () => {
-    setIsSubmitting(true);
-    setSubmissionStatus('idle');
-    try {
-      const result = await supabaseService.saveProjectData({ projectName, clientName, recipients });
+      setIsSubmitting(true);
+      setSubmissionStatus('idle');
+      try {
+          await supabaseService.saveProjectData({ projectName, clientName, recipients });
 
-      // Envia 1 e-mail por destinatário com o link correto (já com ?submissionId=...)
-      recipients.forEach(recipient => {
-        const link = result.links.find(l => l.recipientId === recipient.id)?.url
-          // fallback (não deve acontecer, mas mantém teu padrão antigo)
-          ?? `${window.location.origin}/#/?respondentId=${recipient.id}`;
+          recipients.forEach(recipient => {
+              const subject = `Formulário do Projeto: ${projectName}`;
+              const body = `Olá ${recipient.name},\n\nPor favor, preencha o formulário para o projeto "${projectName}".\n\nAcesse o link abaixo para responder às perguntas designadas a você:\n${window.location.origin}/#/?respondentId=${recipient.id}\n\nObrigado,\nEquipe EnvironPact`;
+              const mailtoLink = `mailto:${recipient.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+              window.open(mailtoLink, '_self');
+          });
 
-        const subject = `Formulário do Projeto: ${projectName}`;
-        const body = `Olá ${recipient.name},\n\nPor favor, preencha o formulário para o projeto "${projectName}".\n\nAcesse o link abaixo para responder às perguntas designadas a você:\n${link}\n\nObrigado,\nEquipe EnvironPact`;
-
-        const mailtoLink = `mailto:${recipient.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-        window.open(mailtoLink, '_self');
-      });
-
-      onProjectCreate({ projectName, clientName, recipients });
-      setSubmissionStatus('success');
-    } catch (error) {
-      console.error("Erro ao salvar e enviar:", error);
-      setSubmissionStatus('error');
-    } finally {
-      setIsSubmitting(false);
-    }
-};
-
+          onProjectCreate({ projectName, clientName, recipients });
+          setSubmissionStatus('success');
+          
+      } catch (error) {
+          console.error("Erro ao salvar e enviar:", error);
+          setSubmissionStatus('error');
+      } finally {
+          setIsSubmitting(false);
+      }
   };
 
 

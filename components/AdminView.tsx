@@ -1,173 +1,139 @@
-import React, { useState, useCallback } from 'react';
-import { Recipient } from '../types';
-import QuestionSelector from './QuestionSelector';
-import { supabaseService } from '../services/supabaseService';
-import { UserPlusIcon, TrashIcon, PencilSquareIcon, CheckCircleIcon } from './icons';
+import React, { useState } from "react";
+import { supabaseService } from "../services/supabaseService";
+import type { Recipient } from "../types";
 
-interface AdminViewProps {
-    onProjectCreate: (data: { projectName: string, clientName: string, recipients: Recipient[] }) => void;
-}
+const DEFAULT_QUESTIONS = [
+  "GHG boundary & scopes",
+  "Energia (SASB IF-EU-130a.1)",
+  "Risco climático (IFRS S2)",
+  "Água",
+  "Resíduos & circularidade",
+];
 
-const AdminView: React.FC<AdminViewProps> = ({ onProjectCreate }) => {
-  const [projectName, setProjectName] = useState('');
-  const [clientName, setClientName] = useState('');
-  const [recipients, setRecipients] = useState<Recipient[]>([]);
-  const [isSelectorOpen, setIsSelectorOpen] = useState(false);
-  const [editingRecipientId, setEditingRecipientId] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submissionStatus, setSubmissionStatus] = useState<'idle' | 'success' | 'error'>('idle');
+export default function AdminView() {
+  const [projectName, setProjectName] = useState("");
+  const [clientName, setClientName] = useState("");
+  const [recipients, setRecipients] = useState<Recipient[]>([
+    { id: crypto.randomUUID(), name: "", role: "", email: "", selectedQuestions: [] },
+  ]);
+  const [loading, setLoading] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [generatedLinks, setGeneratedLinks] = useState<{ name: string; url: string }[]>([]);
 
-  const addRecipient = () => {
-    setRecipients([
-      ...recipients,
-      { id: Date.now().toString(), name: '', role: '', email: '', selectedQuestions: [] },
-    ]);
+  const updateRecipient = (i: number, key: keyof Recipient, val: any) => {
+    setRecipients(prev => prev.map((r, idx) => idx === i ? { ...r, [key]: val } : r));
+  };
+  const toggleQ = (i: number, q: string) => {
+    setRecipients(prev => prev.map((r, idx) => {
+      if (idx !== i) return r;
+      const list = r.selectedQuestions ?? [];
+      return { ...r, selectedQuestions: list.includes(q) ? list.filter(x => x !== q) : [...list, q] };
+    }));
   };
 
-  const updateRecipient = (id: string, field: keyof Recipient, value: any) => {
-    setRecipients(
-      recipients.map(r => (r.id === id ? { ...r, [field]: value } : r))
-    );
-  };
-  
-  const removeRecipient = (id: string) => {
-    setRecipients(recipients.filter(r => r.id !== id));
-  };
+  async function handleSaveAndSend() {
+    setMsg(null);
+    setLoading(true);
+    try {
+      const result = await supabaseService.saveProjectData({ projectName, clientName, recipients });
+      setGeneratedLinks(result.links.map(l => ({ name: l.recipientName, url: l.url })));
 
-  const openQuestionSelector = (id: string) => {
-    setEditingRecipientId(id);
-    setIsSelectorOpen(true);
-  };
-  
-  const handleSaveQuestions = (selectedIds: string[]) => {
-    if (editingRecipientId) {
-      updateRecipient(editingRecipientId, 'selectedQuestions', selectedIds);
+      // Abrir mailto (um por destinatário)
+      recipients.forEach((r) => {
+        const link = result.links.find(x => x.recipientName === r.name)?.url;
+        const subject = `Formulário do Projeto: ${projectName}`;
+        const body =
+          `Olá ${r.name},\n\n` +
+          `Por favor, responda às perguntas do projeto "${projectName}".\n` +
+          `${link}\n\nObrigado,\nEnvironPact`;
+        const mailto = `mailto:${encodeURIComponent(r.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        window.open(mailto, "_self");
+      });
+
+      setMsg("OK: links gerados e e-mails abertos.");
+    } catch (e: any) {
+      setMsg(e?.message ?? String(e));
+    } finally {
+      setLoading(false);
     }
-  };
-
-  const handleSaveAndSend = async () => {
-  setIsSubmitting(true);
-  setSubmissionStatus('idle');
-  try {
-    const result = await supabaseService.saveProjectData({ projectName, clientName, recipients });
-
-    // Abrir e-mail por destinatário com o link contendo ?submissionId=...
-    recipients.forEach(recipient => {
-      const found = result.links.find(l => l.recipientId === recipient.id);
-      const link = found?.url ?? `${window.location.origin}/#/`; // fallback
-
-      const subject = `Formulário do Projeto: ${projectName}`;
-      const body =
-        `Olá ${recipient.name},\n\n` +
-        `Por favor, responda às perguntas do projeto "${projectName}".\n` +
-        `Link: ${link}\n\nObrigado,\nEnvironPact`;
-
-      const mailto = `mailto:${recipient.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-      window.open(mailto, '_self');
-    });
-
-    onProjectCreate({ projectName, clientName, recipients });
-    setSubmissionStatus('success');
-  } catch (error) {
-    console.error("Erro ao salvar e enviar:", error);
-    setSubmissionStatus('error');
-  } finally {
-    setIsSubmitting(false);
   }
-};
 
-  };
-
+  const disabled =
+    !projectName || !clientName || recipients.some(r => !r.name || !r.role || !r.email);
 
   return (
-    <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-      <div className="max-w-5xl mx-auto space-y-10">
-        {/* Etapa 1: Definição do Projeto */}
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold text-gray-800 border-b pb-4">Etapa 1: Definição do projeto e dos pontos focais</h2>
-          <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label htmlFor="projectName" className="block text-sm font-medium text-gray-700">Nome do projeto</label>
-              <input type="text" id="projectName" value={projectName} onChange={e => setProjectName(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"/>
-            </div>
-            <div>
-              <label htmlFor="clientName" className="block text-sm font-medium text-gray-700">Nome do cliente</label>
-              <input type="text" id="clientName" value={clientName} onChange={e => setClientName(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"/>
-            </div>
-          </div>
-        </div>
+    <div style={{ maxWidth: 900, margin: "32px auto", padding: 16 }}>
+      <h1>Admin – Criar Projeto & Enviar Links</h1>
 
-        {/* Etapa 2: Pontos Focais e Perguntas */}
-        <div className="bg-white p-6 rounded-lg shadow-md">
-            <div className="flex justify-between items-center border-b pb-4">
-                <h2 className="text-xl font-semibold text-gray-800">Etapa 2: Pontos Focais (Destinatários) e Perguntas</h2>
-                <button onClick={addRecipient} className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-emerald-600 rounded-md shadow-sm hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500">
-                    <UserPlusIcon className="w-5 h-5" />
-                    Adicionar Ponto Focal
-                </button>
-            </div>
-          
-            <div className="mt-6 space-y-4">
-            {recipients.map((recipient) => (
-              <div key={recipient.id} className="p-5 border-2 border-dashed rounded-lg bg-gray-50/70">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
-                  <div>
-                    <label htmlFor={`recipient-name-${recipient.id}`} className="block text-sm font-medium text-gray-700 mb-1">Nome do Ponto Focal</label>
-                    <input type="text" id={`recipient-name-${recipient.id}`} placeholder="Nome completo" value={recipient.name} onChange={e => updateRecipient(recipient.id, 'name', e.target.value)} className="w-full rounded-md border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"/>
-                  </div>
-                  <div>
-                    <label htmlFor={`recipient-role-${recipient.id}`} className="block text-sm font-medium text-gray-700 mb-1">Cargo</label>
-                    <input type="text" id={`recipient-role-${recipient.id}`} placeholder="Cargo do ponto focal" value={recipient.role} onChange={e => updateRecipient(recipient.id, 'role', e.target.value)} className="w-full rounded-md border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"/>
-                  </div>
-                  <div>
-                    <label htmlFor={`recipient-email-${recipient.id}`} className="block text-sm font-medium text-gray-700 mb-1">E-mail</label>
-                    <input type="email" id={`recipient-email-${recipient.id}`} placeholder="email@cliente.com" value={recipient.email} onChange={e => updateRecipient(recipient.id, 'email', e.target.value)} className="w-full rounded-md border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"/>
-                  </div>
-                </div>
-                <div className="mt-5 flex justify-between items-center">
-                    <button onClick={() => openQuestionSelector(recipient.id)} className="inline-flex items-center gap-2 text-sm font-medium text-emerald-700 hover:text-emerald-900">
-                        <PencilSquareIcon className="w-5 h-5" />
-                        Selecionar Perguntas ({recipient.selectedQuestions.length} selecionadas)
-                    </button>
-                    <button onClick={() => removeRecipient(recipient.id)} className="text-red-600 hover:text-red-800">
-                        <TrashIcon className="w-5 h-5"/>
-                    </button>
-                </div>
-              </div>
-            ))}
-            {recipients.length === 0 && (
-                <div className="text-center text-gray-500 py-6 border-2 border-dashed rounded-lg">
-                    <p>Nenhum ponto focal adicionado.</p>
-                    <p className="text-sm mt-1">Clique em "Adicionar Ponto Focal" para começar.</p>
-                </div>
-            )}
-          </div>
-        </div>
-        
-        {/* Ação Final */}
-        <div className="flex justify-end items-center gap-4">
-            {submissionStatus === 'success' && <div className="text-green-600 flex items-center gap-2"><CheckCircleIcon className="w-5 h-5"/> E-mails gerados e dados salvos!</div>}
-            {submissionStatus === 'error' && <div className="text-red-600">Ocorreu um erro.</div>}
-            <button
-                onClick={handleSaveAndSend}
-                disabled={!projectName || !clientName || recipients.length === 0 || recipients.some(r => !r.name || !r.email) || isSubmitting}
-                className="px-6 py-3 text-base font-medium text-white bg-emerald-600 rounded-md shadow-sm hover:bg-emerald-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-                {isSubmitting ? 'Salvando...' : 'Salvar e Enviar E-mails'}
-            </button>
-        </div>
+      <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
+        <label>Project Name
+          <input value={projectName} onChange={e => setProjectName(e.target.value)} />
+        </label>
+        <label>Client Name
+          <input value={clientName} onChange={e => setClientName(e.target.value)} />
+        </label>
       </div>
 
-      {editingRecipientId && (
-        <QuestionSelector
-          isOpen={isSelectorOpen}
-          onClose={() => setIsSelectorOpen(false)}
-          selectedQuestions={recipients.find(r => r.id === editingRecipientId)?.selectedQuestions || []}
-          onSave={handleSaveQuestions}
-        />
+      <h2 style={{ marginTop: 24 }}>Destinatários</h2>
+
+      {recipients.map((r, i) => (
+        <div key={r.id} style={{ border: "1px solid #ddd", borderRadius: 8, padding: 12, margin: "12px 0" }}>
+          <div style={{ display: "grid", gap: 8 }}>
+            <label>Nome
+              <input value={r.name} onChange={e => updateRecipient(i, "name", e.target.value)} />
+            </label>
+            <label>Role
+              <input value={r.role} onChange={e => updateRecipient(i, "role", e.target.value)} />
+            </label>
+            <label>Email
+              <input type="email" value={r.email} onChange={e => updateRecipient(i, "email", e.target.value)} />
+            </label>
+          </div>
+
+          <fieldset style={{ marginTop: 8 }}>
+            <legend>Select questions</legend>
+            {DEFAULT_QUESTIONS.map(q => (
+              <label key={q} style={{ display: "inline-flex", gap: 6, marginRight: 16 }}>
+                <input
+                  type="checkbox"
+                  checked={(r.selectedQuestions ?? []).includes(q)}
+                  onChange={() => toggleQ(i, q)}
+                />
+                {q}
+              </label>
+            ))}
+          </fieldset>
+        </div>
+      ))}
+
+      <div style={{ display: "flex", gap: 8 }}>
+        <button type="button" onClick={() =>
+          setRecipients(prev => [...prev, { id: crypto.randomUUID(), name: "", role: "", email: "", selectedQuestions: [] }])
+        }>+ Adicionar destinatário</button>
+
+        <button type="button" onClick={() =>
+          setRecipients(prev => prev.length > 1 ? prev.slice(0, -1) : prev)
+        }>- Remover último</button>
+      </div>
+
+      <div style={{ marginTop: 16 }}>
+        <button onClick={handleSaveAndSend} disabled={disabled || loading}>
+          {loading ? "Enviando..." : "Salvar & abrir e-mails"}
+        </button>
+      </div>
+
+      {msg && <p style={{ marginTop: 12, color: msg.startsWith("OK") ? "green" : "crimson" }}>{msg}</p>}
+
+      {!!generatedLinks.length && (
+        <>
+          <h3 style={{ marginTop: 20 }}>Links gerados</h3>
+          <ul>
+            {generatedLinks.map((l) => (
+              <li key={l.url}><a href={l.url} target="_blank">{l.name}</a></li>
+            ))}
+          </ul>
+        </>
       )}
     </div>
   );
-
-
-export default AdminView;
+}

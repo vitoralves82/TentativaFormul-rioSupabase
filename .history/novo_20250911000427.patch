@@ -1,0 +1,18 @@
+-    <select id="groupColor" title="Cor do grupo">
+-      <option value="">Cor (opcional)</option>
+-      <option>grey</option><option>blue</option><option>red</option>
+-      <option>yellow</option><option>green</option><option>pink</option>
+-      <option>purple</option><option>cyan</option><option>orange</option>
+-    </select>
++    <select id="groupColor" title="Cor do grupo">
++      <option value="">Cor (opcional)</option>
++      <option value="grey"   style="background:grey;color:white;">⬤ Cinza</option>
++      <option value="blue"   style="background:blue;color:white;">⬤ Azul</option>
++      <option value="red"    style="background:red;color:white;">⬤ Vermelho</option>
++      <option value="yellow" style="background:gold;color:black;">⬤ Amarelo</option>
++      <option value="green"  style="background:green;color:white;">⬤ Verde</option>
++      <option value="pink"   style="background:hotpink;color:black;">⬤ Rosa</option>
++      <option value="purple" style="background:purple;color:white;">⬤ Roxo</option>
++      <option value="cyan"   style="background:cyan;color:black;">⬤ Ciano</option>
++      <option value="orange" style="background:orange;color:black;">⬤ Laranja</option>
++    </select>

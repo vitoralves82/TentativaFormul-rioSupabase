@@ -1,29 +1,19 @@
-export interface Question {
-  id: string;
-  category: string;
-  code: string;
-  number: number;
+export type Answer = {
   text: string;
-}
+  fileName?: string;
+  file?: File | null;
+};
 
-export interface Recipient {
+export type Recipient = {
   id: string;
   name: string;
   role: string;
   email: string;
-  selectedQuestions: string[];
-}
+  selectedQuestions?: string[];
+};
 
-export interface Answer {
-  text?: string;
-  file?: File | null;
-  fileName?: string;
-}
-
-export type ViewMode = 'admin' | 'respondent';
-
-export interface ProjectData {
+export type ProjectData = {
   projectName: string;
   clientName: string;
   recipients: Recipient[];
-}
+};

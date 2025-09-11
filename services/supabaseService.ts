@@ -1,7 +1,7 @@
 import { supabase } from "./supabase";
-import type { ProjectData, Answer, Recipient } from "../types";
+import type { ProjectData, Answer } from "../types";
 
-// Lê param tanto em search (?x=) quanto no hash (#/?x=)
+// lê parâmetro por search (?x=) e por hash (#/?x=)
 function getQueryParam(name: string): string | null {
   const s1 = new URLSearchParams(window.location.search).get(name);
   if (s1) return s1;
@@ -14,43 +14,40 @@ function getQueryParam(name: string): string | null {
 
 type SaveProjectResult = {
   success: true;
-  links: Array<{ recipientId: string; submissionId: string; url: string }>;
+  links: Array<{ recipientName: string; submissionId: string; url: string }>;
 };
 
 export const supabaseService = {
-  // Cria uma submission por destinatário e devolve o link já com ?submissionId=...
-  saveProjectData: async (projectData: ProjectData): Promise<SaveProjectResult> => {
-    const { projectName, clientName, recipients } = projectData;
-    const links: Array<{ recipientId: string; submissionId: string; url: string }> = [];
+  // cria uma submission por destinatário e retorna links com ?submissionId=...
+  async saveProjectData(projectData: ProjectData): Promise<SaveProjectResult> {
+    const links: Array<{ recipientName: string; submissionId: string; url: string }> = [];
 
-    for (const r of recipients) {
-      const payload = {
-        mode: "intake",
-        projectName,
-        clientName,
-        recipientName: r.name,
-        role: r.role,
-        email: r.email,
-        selectedQuestions: r.selectedQuestions ?? [],
-      };
-      const { data, error } = await supabase.functions.invoke("submit-intake", { body: payload });
+    for (const r of projectData.recipients) {
+      const { data, error } = await supabase.functions.invoke("submit-intake", {
+        body: {
+          mode: "intake",
+          projectName: projectData.projectName,
+          clientName:  projectData.clientName,
+          recipientName: r.name,
+          role: r.role,
+          email: r.email,
+          selectedQuestions: r.selectedQuestions ?? [],
+        },
+      });
       if (error) throw error;
-
       const submissionId = (data as any)?.submissionId as string | undefined;
-      if (!submissionId) throw new Error("Falha ao obter submissionId");
+      if (!submissionId) throw new Error("Falha ao obter submissionId da função");
 
+      // mantém hash-route (/#/?submissionId=...)
       const url = `${window.location.origin}/#/?submissionId=${submissionId}`;
-      links.push({ recipientId: r.id, submissionId, url });
+      links.push({ recipientName: r.name, submissionId, url });
     }
 
     return { success: true, links };
   },
 
-  // Envia respostas lendo o submissionId da URL (search ou hash)
-  saveAnswers: async (
-    _respondentId: string,
-    answersMap: { [key: string]: Answer }
-  ): Promise<{ success: true }> => {
+  // envia respostas (lendo submissionId da URL)
+  async saveAnswers(_respondentId: string, answersMap: { [key: string]: Answer }) {
     const submissionId = getQueryParam("submissionId");
     if (!submissionId) throw new Error("submissionId não encontrado na URL (?submissionId=...)");
 
@@ -68,10 +65,20 @@ export const supabaseService = {
   },
 };
 
-// Alias opcional — se algum arquivo importar submitAnswers
+// Alias, caso algum arquivo importe esses nomes:
 export async function submitAnswers(
   respondentId: string,
   answersMap: { [key: string]: Answer }
 ) {
   return supabaseService.saveAnswers(respondentId, answersMap);
+}
+export async function submitIntakeCompat(payload: {
+  projectName: string; clientName: string; recipientName: string;
+  role: string; email: string; selectedQuestions: string[];
+}) {
+  const { data, error } = await supabase.functions.invoke("submit-intake", {
+    body: { mode: "intake", ...payload },
+  });
+  if (error) throw error;
+  return (data as any)?.submissionId as string;
 }
